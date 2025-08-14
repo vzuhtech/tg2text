@@ -4,8 +4,13 @@ from openai import AsyncOpenAI
 
 
 class OpenAITranscriber:
-	def __init__(self, api_key: str) -> None:
-		self.client = AsyncOpenAI(api_key=api_key)
+	def __init__(self, api_key: str, organization: Optional[str] = None, project: Optional[str] = None) -> None:
+		client_kwargs = {"api_key": api_key}
+		if organization:
+			client_kwargs["organization"] = organization
+		if project:
+			client_kwargs["project"] = project
+		self.client = AsyncOpenAI(**client_kwargs)
 
 	async def transcribe_ogg_bytes(self, audio_bytes: bytes, language: Optional[str] = None) -> str:
 		file_like = io.BytesIO(audio_bytes)
@@ -13,7 +18,6 @@ class OpenAITranscriber:
 		models = ("whisper-1", "gpt-4o-mini-transcribe")
 		last_err: Exception | None = None
 		for model_name in models:
-			# rewind for every attempt
 			file_like.seek(0)
 			params = {"model": model_name}
 			if language:
@@ -26,7 +30,7 @@ class OpenAITranscriber:
 				text = (getattr(result, "text", None) or "").strip()
 				if text:
 					return text
-			except Exception as e:  # noqa: BLE001 - bubble up after trying fallbacks
+			except Exception as e:  # noqa: BLE001
 				last_err = e
 		if last_err:
 			raise last_err

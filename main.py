@@ -25,7 +25,11 @@ async def on_startup() -> None:
 	if not settings.telegram_bot_token or not settings.openai_api_key:
 		raise RuntimeError("TELEGRAM_BOT_TOKEN and OPENAI_API_KEY must be set")
 	app.state.tg = TelegramAPI(settings.telegram_bot_token)
-	app.state.asr = OpenAITranscriber(settings.openai_api_key)
+	app.state.asr = OpenAITranscriber(
+		settings.openai_api_key,
+		organization=settings.openai_org_id,
+		project=settings.openai_project_id,
+	)
 	if settings.app_base_url:
 		url = settings.app_base_url.rstrip("/") + "/webhook/telegram"
 		try:
@@ -95,10 +99,15 @@ async def telegram_webhook(request: Request) -> JSONResponse:
 			transcript = "Не получилось распознать голос."
 	except Exception as e:
 		logger.exception("Transcription error: %s", e)
-		if settings.debug:
-			transcript = f"Ошибка распознавания: {e}"
+		msg = str(e)
+		if "insufficient_quota" in msg or "You exceeded your current quota" in msg:
+			user_text = "Лимит OpenAI исчерпан. Проверь план и биллинг аккаунта."
+		elif settings.debug:
+			user_text = f"Ошибка распознавания: {e}"
 		else:
-			transcript = "Произошла ошибка распознавания. Попробуйте ещё раз."
+			user_text = "Произошла ошибка распознавания. Попробуйте ещё раз."
+		await app.state.tg.send_message(chat_id, user_text, reply_to_message_id=message_id)
+		return JSONResponse({"ok": True})
 
 	await app.state.tg.send_message(chat_id, transcript, reply_to_message_id=message_id)
 	return JSONResponse({"ok": True})

@@ -7,6 +7,8 @@
 1. Создай `env.example` копированием в `.env` и укажи:
    - `TELEGRAM_BOT_TOKEN`
    - `OPENAI_API_KEY`
+   - `OPENAI_ORG_ID` (опционально)
+   - `OPENAI_PROJECT_ID` (опционально)
    - `APP_BASE_URL` (для вебхука в проде; локально можно оставить пустым)
    - `WEBHOOK_SECRET` (опционально)
    - `DEBUG=1` (опционально — выводит текст ошибки в ответе)
@@ -28,6 +30,8 @@
 3. В Variables добавь:
    - `TELEGRAM_BOT_TOKEN`
    - `OPENAI_API_KEY`
+   - `OPENAI_ORG_ID` (если используешь Organizations)
+   - `OPENAI_PROJECT_ID` (если используешь Projects)
    - `APP_BASE_URL` = публичный домен Railway (например, `https://your-app.up.railway.app`)
    - `WEBHOOK_SECRET` (любая строка; защита вебхука заголовком)
    - `DEBUG=1` (по желанию)
@@ -39,8 +43,7 @@
 
 ### Траблшутинг распознавания
 
-- Проверь логи Railway → Deployments → Logs.
+- `429 insufficient_quota` — проверь платёжные данные и лимиты на `platform.openai.com`.
 - Включи `DEBUG=1`, чтобы бот отвечал текстом ошибки (временно, не для продакшна).
-- Проверь, что формат голосового — OGG/OPUS (Telegram voice). Для `audio` могут быть другие контейнеры; OpenAI в большинстве случаев принимает.
-- Убедись, что `OPENAI_API_KEY` валидный и у аккаунта есть доступ к `whisper-1`. В коде есть резервная попытка `gpt-4o-mini-transcribe`.
-- Слишком длинные/шумные сообщения могут распознаваться хуже; попробуй короче/громче.
+- Проверь логи Railway → Deployments → Logs.
+- Формат: Telegram `voice` — OGG/OPUS; поддержаны также `audio`, `video_note`.
