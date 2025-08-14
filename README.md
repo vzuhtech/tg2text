@@ -8,7 +8,12 @@
    - `TELEGRAM_BOT_TOKEN`
    - Провайдер STT:
      - OpenAI: `STT_PROVIDER=openai`, `OPENAI_API_KEY` (+ при необходимости `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`)
-     - Vosk: `STT_PROVIDER=vosk`, `VOSK_MODEL_PATH` (путь к распакованной модели), `FFMPEG_BIN` (если не в PATH)
+     - Vosk: `STT_PROVIDER=vosk`. Модель может скачиваться автоматически:
+       - `VOSK_MODEL_URL` — URL архива модели (`.zip` или `.tar.gz`), по умолчанию русская small
+       - `VOSK_MODEL_SHA256` — опционально, контрольная сумма
+       - `VOSK_STORAGE_DIR` — куда класть модели (по умолчанию `/app/models`)
+       - `VOSK_MODEL_PATH` — опционально, итоговый путь модели (если не задан, будет `/app/models/vosk-model`)
+       - `FFMPEG_BIN` — путь к ffmpeg (по умолчанию `ffmpeg`)
    - `APP_BASE_URL` (для вебхука в проде; локально можно пустым)
    - `WEBHOOK_SECRET` (опционально)
    - `DEBUG=1` (опционально для подробных ошибок)
@@ -16,26 +21,23 @@
    ```bash
    pip install -r requirements.txt
    ```
-3. Модель Vosk (пример для русского):
-   - Скачай модель, например `vosk-model-small-ru-0.22` с `https://alphacephei.com/vosk/models`
-   - Распакуй и укажи путь к папке модели в `VOSK_MODEL_PATH`
-4. Запуск:
+3. Запуск:
    ```bash
    uvicorn main:app --reload
    ```
 
 ### Деплой на Railway
 
-- Для OpenAI: достаточно стандартных переменных (`STT_PROVIDER=openai`, ключи OpenAI, `APP_BASE_URL`).
-- Для Vosk: добавь переменные `STT_PROVIDER=vosk`, `VOSK_MODEL_PATH=/app/models/vosk`, и положи модель в репозиторий или загружай на старте (см. ниже). В проект уже добавлен `nixpacks.toml`, который устанавливает `ffmpeg`.
-
-#### Как положить модель Vosk на Railway
-- Вариант простой: добавить папку модели в репозиторий (большой размер!) и выставить `VOSK_MODEL_PATH` на неё.
-- Вариант экономный: на старте скачивать и распаковывать модель (нужно добавить код/скрипт скачивания и кэшировать в volumes). Могу добавить авто-скачивание при старте.
+- Для OpenAI: стандартные переменные (`STT_PROVIDER=openai`, ключи OpenAI, `APP_BASE_URL`).
+- Для Vosk (автоскачивание):
+  - `STT_PROVIDER=vosk`
+  - (опц.) `VOSK_MODEL_URL`, `VOSK_MODEL_SHA256`, `VOSK_STORAGE_DIR`, `VOSK_MODEL_PATH`
+  - `FFMPEG_BIN=ffmpeg`
+  - При старте модель скачается и распакуется в указанную директорию. `nixpacks.toml` уже устанавливает `ffmpeg`.
 
 ### Команды
 - `/start` — бот подскажет отправить голосовое сообщение.
 
 ### Траблшутинг
-- `429 insufficient_quota` — для OpenAI проверь план/биллинг.
-- Для Vosk убедись, что установлен `ffmpeg` (в Railway ставится через `nixpacks.toml`), `VOSK_MODEL_PATH` корректен, и модель распакована.
+- OpenAI `429 insufficient_quota` — проверь план/биллинг.
+- Vosk — смотри логи старта: сообщение `Vosk model ready at ...`. Если ошибка — проверь URL/сумму/доступность `ffmpeg`.

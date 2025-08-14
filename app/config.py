@@ -20,6 +20,12 @@ class Settings(BaseModel):
 	debug: bool = False
 	stt_provider: str = "openai"  # "openai" or "vosk"
 	vosk_model_path: str | None = None
+	vosk_model_url: str = os.getenv(
+		"VOSK_MODEL_URL",
+		"https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip",
+	)
+	vosk_model_sha256: str | None = os.getenv("VOSK_MODEL_SHA256", None)
+	vosk_storage_dir: str = os.getenv("VOSK_STORAGE_DIR", "/app/models")
 	ffmpeg_bin: str = os.getenv("FFMPEG_BIN", "ffmpeg")
 
 	class Config:
@@ -37,5 +43,8 @@ def get_settings() -> Settings:
 		debug=_env_bool("DEBUG", False),
 		stt_provider=os.getenv("STT_PROVIDER", "openai").strip().lower(),
 		vosk_model_path=os.getenv("VOSK_MODEL_PATH", None),
+		vosk_model_url=os.getenv("VOSK_MODEL_URL", "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip"),
+		vosk_model_sha256=os.getenv("VOSK_MODEL_SHA256", None),
+		vosk_storage_dir=os.getenv("VOSK_STORAGE_DIR", "/app/models"),
 		ffmpeg_bin=os.getenv("FFMPEG_BIN", "ffmpeg"),
 	)

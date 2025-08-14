@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.telegram import TelegramAPI
 from app.transcribe import OpenAITranscriber
 from app.vosk_asr import VoskTranscriber
+from app.vosk_download import ensure_vosk_model
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tg2text")
@@ -28,9 +29,15 @@ async def on_startup() -> None:
 	app.state.tg = TelegramAPI(settings.telegram_bot_token)
 	# Select STT provider
 	if settings.stt_provider == "vosk":
-		if not settings.vosk_model_path:
-			raise RuntimeError("VOSK_MODEL_PATH must be set when STT_PROVIDER=vosk")
-		app.state.asr = VoskTranscriber(settings.vosk_model_path, ffmpeg_bin=settings.ffmpeg_bin)
+		# decide model directory
+		model_dir = settings.vosk_model_path or os.path.join(settings.vosk_storage_dir, "vosk-model")
+		try:
+			model_dir = await ensure_vosk_model(model_dir, settings.vosk_model_url, settings.vosk_model_sha256)
+			logger.info("Vosk model ready at %s", model_dir)
+		except Exception as e:
+			logger.exception("Failed to prepare Vosk model: %s", e)
+			raise
+		app.state.asr = VoskTranscriber(model_dir, ffmpeg_bin=settings.ffmpeg_bin)
 	else:
 		if not settings.openai_api_key:
 			raise RuntimeError("OPENAI_API_KEY must be set for OpenAI STT")
