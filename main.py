@@ -2,10 +2,14 @@ import os
 from typing import Any, Dict, Optional
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
+import logging
 
 from app.config import get_settings
 from app.telegram import TelegramAPI
 from app.transcribe import OpenAITranscriber
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("tg2text")
 
 app = FastAPI()
 
@@ -19,18 +23,16 @@ async def health() -> Dict[str, str]:
 async def on_startup() -> None:
 	settings = get_settings()
 	if not settings.telegram_bot_token or not settings.openai_api_key:
-		# Fail-fast if config missing
 		raise RuntimeError("TELEGRAM_BOT_TOKEN and OPENAI_API_KEY must be set")
 	app.state.tg = TelegramAPI(settings.telegram_bot_token)
 	app.state.asr = OpenAITranscriber(settings.openai_api_key)
-	# Auto-set webhook if APP_BASE_URL provided
 	if settings.app_base_url:
 		url = settings.app_base_url.rstrip("/") + "/webhook/telegram"
 		try:
 			await app.state.tg.set_webhook(url, settings.secret_token)
-		except Exception:
-			# Ignore webhook failures during local dev
-			pass
+			logger.info("Webhook set to %s", url)
+		except Exception as e:
+			logger.exception("Failed to set webhook: %s", e)
 
 
 @app.on_event("shutdown")
@@ -66,7 +68,6 @@ async def telegram_webhook(request: Request) -> JSONResponse:
 
 	voice = message.get("voice") or message.get("audio") or message.get("video_note")
 	if not voice:
-		# not a voice - prompt user
 		await app.state.tg.send_message(chat_id, "Пожалуйста, пришли голосовое сообщение (voice).", reply_to_message_id=message_id)
 		return JSONResponse({"ok": True})
 
@@ -74,22 +75,30 @@ async def telegram_webhook(request: Request) -> JSONResponse:
 	if not file_id:
 		return JSONResponse({"ok": True})
 
-	# Fetch and download file
-	file_info = await app.state.tg.get_file(file_id)
-	file_path = (file_info.get("result") or {}).get("file_path")
-	if not file_path:
-		await app.state.tg.send_message(chat_id, "Не смог получить файл от Telegram.", reply_to_message_id=message_id)
+	try:
+		file_info = await app.state.tg.get_file(file_id)
+		file_path = (file_info.get("result") or {}).get("file_path")
+		if not file_path:
+			await app.state.tg.send_message(chat_id, "Не смог получить файл от Telegram.", reply_to_message_id=message_id)
+			return JSONResponse({"ok": True})
+		data = await app.state.tg.download_file_bytes(file_path)
+		logger.info("Downloaded voice file %s (%d bytes)", file_path, len(data))
+	except Exception as e:
+		logger.exception("Failed to download voice: %s", e)
+		await app.state.tg.send_message(chat_id, "Ошибка получения файла от Telegram.", reply_to_message_id=message_id)
 		return JSONResponse({"ok": True})
 
-	data = await app.state.tg.download_file_bytes(file_path)
-
-	# Transcribe via OpenAI
+	settings = get_settings()
 	try:
 		transcript = await app.state.asr.transcribe_ogg_bytes(data)
 		if not transcript:
 			transcript = "Не получилось распознать голос."
-	except Exception:
-		transcript = "Произошла ошибка распознавания. Попробуйте ещё раз."
+	except Exception as e:
+		logger.exception("Transcription error: %s", e)
+		if settings.debug:
+			transcript = f"Ошибка распознавания: {e}"
+		else:
+			transcript = "Произошла ошибка распознавания. Попробуйте ещё раз."
 
 	await app.state.tg.send_message(chat_id, transcript, reply_to_message_id=message_id)
 	return JSONResponse({"ok": True})
