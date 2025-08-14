@@ -7,6 +7,7 @@ import logging
 from app.config import get_settings
 from app.telegram import TelegramAPI
 from app.transcribe import OpenAITranscriber
+from app.vosk_asr import VoskTranscriber
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("tg2text")
@@ -22,14 +23,22 @@ async def health() -> Dict[str, str]:
 @app.on_event("startup")
 async def on_startup() -> None:
 	settings = get_settings()
-	if not settings.telegram_bot_token or not settings.openai_api_key:
-		raise RuntimeError("TELEGRAM_BOT_TOKEN and OPENAI_API_KEY must be set")
+	if not settings.telegram_bot_token:
+		raise RuntimeError("TELEGRAM_BOT_TOKEN must be set")
 	app.state.tg = TelegramAPI(settings.telegram_bot_token)
-	app.state.asr = OpenAITranscriber(
-		settings.openai_api_key,
-		organization=settings.openai_org_id,
-		project=settings.openai_project_id,
-	)
+	# Select STT provider
+	if settings.stt_provider == "vosk":
+		if not settings.vosk_model_path:
+			raise RuntimeError("VOSK_MODEL_PATH must be set when STT_PROVIDER=vosk")
+		app.state.asr = VoskTranscriber(settings.vosk_model_path, ffmpeg_bin=settings.ffmpeg_bin)
+	else:
+		if not settings.openai_api_key:
+			raise RuntimeError("OPENAI_API_KEY must be set for OpenAI STT")
+		app.state.asr = OpenAITranscriber(
+			settings.openai_api_key,
+			organization=settings.openai_org_id,
+			project=settings.openai_project_id,
+		)
 	if settings.app_base_url:
 		url = settings.app_base_url.rstrip("/") + "/webhook/telegram"
 		try:

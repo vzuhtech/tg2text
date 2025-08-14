@@ -1,49 +1,41 @@
-## Telegram Voice-to-Text Bot (FastAPI + OpenAI)
+## Telegram Voice-to-Text Bot (FastAPI + OpenAI/Vosk)
 
-Бот принимает голосовые сообщения в Telegram, распознаёт через OpenAI и отвечает текстом. Готов для деплоя на Railway.
+Бот принимает голосовые сообщения в Telegram и отвечает текстом. Поддерживаются два провайдера распознавания: OpenAI (облако) и Vosk (бесплатно/офлайн).
 
 ### Локальный запуск
 
-1. Создай `env.example` копированием в `.env` и укажи:
+1. Скопируй `env.example` в `.env` и укажи:
    - `TELEGRAM_BOT_TOKEN`
-   - `OPENAI_API_KEY`
-   - `OPENAI_ORG_ID` (опционально)
-   - `OPENAI_PROJECT_ID` (опционально)
-   - `APP_BASE_URL` (для вебхука в проде; локально можно оставить пустым)
+   - Провайдер STT:
+     - OpenAI: `STT_PROVIDER=openai`, `OPENAI_API_KEY` (+ при необходимости `OPENAI_ORG_ID`, `OPENAI_PROJECT_ID`)
+     - Vosk: `STT_PROVIDER=vosk`, `VOSK_MODEL_PATH` (путь к распакованной модели), `FFMPEG_BIN` (если не в PATH)
+   - `APP_BASE_URL` (для вебхука в проде; локально можно пустым)
    - `WEBHOOK_SECRET` (опционально)
-   - `DEBUG=1` (опционально — выводит текст ошибки в ответе)
-2. Установи зависимости:
+   - `DEBUG=1` (опционально для подробных ошибок)
+2. Установка зависимостей:
    ```bash
    pip install -r requirements.txt
    ```
-3. Запусти сервер:
+3. Модель Vosk (пример для русского):
+   - Скачай модель, например `vosk-model-small-ru-0.22` с `https://alphacephei.com/vosk/models`
+   - Распакуй и укажи путь к папке модели в `VOSK_MODEL_PATH`
+4. Запуск:
    ```bash
    uvicorn main:app --reload
    ```
 
-Локально вебхук не нужен. Для теста можно использовать `ngrok` и задать `APP_BASE_URL`.
-
 ### Деплой на Railway
 
-1. Запушь проект в GitHub.
-2. В Railway создай новый проект из репозитория.
-3. В Variables добавь:
-   - `TELEGRAM_BOT_TOKEN`
-   - `OPENAI_API_KEY`
-   - `OPENAI_ORG_ID` (если используешь Organizations)
-   - `OPENAI_PROJECT_ID` (если используешь Projects)
-   - `APP_BASE_URL` = публичный домен Railway (например, `https://your-app.up.railway.app`)
-   - `WEBHOOK_SECRET` (любая строка; защита вебхука заголовком)
-   - `DEBUG=1` (по желанию)
-4. Деплой. На старте приложение автоматически вызовет `setWebhook` на `APP_BASE_URL/webhook/telegram`.
+- Для OpenAI: достаточно стандартных переменных (`STT_PROVIDER=openai`, ключи OpenAI, `APP_BASE_URL`).
+- Для Vosk: добавь переменные `STT_PROVIDER=vosk`, `VOSK_MODEL_PATH=/app/models/vosk`, и положи модель в репозиторий или загружай на старте (см. ниже). В проект уже добавлен `nixpacks.toml`, который устанавливает `ffmpeg`.
+
+#### Как положить модель Vosk на Railway
+- Вариант простой: добавить папку модели в репозиторий (большой размер!) и выставить `VOSK_MODEL_PATH` на неё.
+- Вариант экономный: на старте скачивать и распаковывать модель (нужно добавить код/скрипт скачивания и кэшировать в volumes). Могу добавить авто-скачивание при старте.
 
 ### Команды
-
 - `/start` — бот подскажет отправить голосовое сообщение.
 
-### Траблшутинг распознавания
-
-- `429 insufficient_quota` — проверь платёжные данные и лимиты на `platform.openai.com`.
-- Включи `DEBUG=1`, чтобы бот отвечал текстом ошибки (временно, не для продакшна).
-- Проверь логи Railway → Deployments → Logs.
-- Формат: Telegram `voice` — OGG/OPUS; поддержаны также `audio`, `video_note`.
+### Траблшутинг
+- `429 insufficient_quota` — для OpenAI проверь план/биллинг.
+- Для Vosk убедись, что установлен `ffmpeg` (в Railway ставится через `nixpacks.toml`), `VOSK_MODEL_PATH` корректен, и модель распакована.

@@ -5,3 +5,4 @@ openai==1.35.13
 python-dotenv==1.0.1
 pydantic==2.8.2
 anyio==4.4.0
+vosk==0.3.45

@@ -18,6 +18,9 @@ class Settings(BaseModel):
 	app_base_url: str
 	secret_token: str | None = None
 	debug: bool = False
+	stt_provider: str = "openai"  # "openai" or "vosk"
+	vosk_model_path: str | None = None
+	ffmpeg_bin: str = os.getenv("FFMPEG_BIN", "ffmpeg")
 
 	class Config:
 		arbitrary_types_allowed = True
@@ -32,4 +35,7 @@ def get_settings() -> Settings:
 		app_base_url=os.getenv("APP_BASE_URL", ""),
 		secret_token=os.getenv("WEBHOOK_SECRET", None),
 		debug=_env_bool("DEBUG", False),
+		stt_provider=os.getenv("STT_PROVIDER", "openai").strip().lower(),
+		vosk_model_path=os.getenv("VOSK_MODEL_PATH", None),
+		ffmpeg_bin=os.getenv("FFMPEG_BIN", "ffmpeg"),
 	)
